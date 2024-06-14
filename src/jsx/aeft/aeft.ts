@@ -1,9 +1,11 @@
-export const example = () => {
-  return extractPaths();
+import { getActiveComp } from "./aeft-utils";
+
+export const goKeyflames = () => {
+  return extractPaths() + `<style>${scanTransformToCSS()}\n</style>`;
 };
 
-function extractPaths() {
-  var comp = app.project.activeItem;
+export const extractPaths = () => {
+  var comp = getActiveComp();
   var svgCode =
     '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" x="0px" y="0px" viewBox="0 0 ' +
     comp.width +
@@ -16,27 +18,25 @@ function extractPaths() {
     '" xml:space="preserve">';
 
   var selected = comp.selectedLayers;
-  // alert(selected[0].trackMatteLayer)
-  // return false
+
   for (var s = selected.length - 1; s > -1; s--) {
     var selectedGroups = selected[s].property("ADBE Root Vectors Group");
     var layerName = selected[s].name;
 
     var layerPosX = selected[s].transform.xPosition;
     var layerPosY = selected[s].transform.yPosition;
-    var layerPosValX, layerPosValY;
-    if (layerPosX.numKeys > 0) {
-      layerPosValX = layerPosX.keyValue(1);
-    } else {
-      layerPosValX = layerPosX.value;
+    var layerPosValX = layerPosX.value;
+    var layerPosValY = layerPosY.value;
+    if (layerPosX.numKeys > 0) layerPosValX = layerPosX.keyValue(1);
+    if (layerPosY.numKeys > 0) layerPosValY = layerPosY.keyValue(1);
+
+    var layerAnchor: number[] = selected[s].transform.anchorPoint.value;
+    var layerPosVal: number[] = [layerPosValX, layerPosValY];
+    var layerPos: number[] = [];
+
+    for (let i = 0; i < layerPosVal.length; i++) {
+      layerPos[i] = layerPosVal[i] - layerAnchor[i];
     }
-    if (layerPosY.numKeys > 0) {
-      layerPosValY = layerPosY.keyValue(1);
-    } else {
-      layerPosValY = layerPosY.value;
-    }
-    var layerAnchor = selected[s].transform.anchorPoint;
-    var layerPos = [layerPosValX, layerPosValY] - layerAnchor.value;
 
     svgCode +=
       '<g id="' +
@@ -98,7 +98,7 @@ function extractPaths() {
   }
   svgCode += "</svg>";
   return svgCode;
-}
+};
 
 function roundAndSumRow(arrayOfPairs: number[][], x: number, y: number) {
   var result = [];
@@ -206,4 +206,200 @@ function convertPointsToSVGPath(points, inTangents, outTangents) {
   }
 
   return path;
+}
+
+export const scanTransformToCSS = () => {
+  var props = [
+    ["ADBE Scale", "scal"],
+    ["ADBE Rotate Z", "rot"],
+    ["ADBE Position_0", "posX"],
+    ["ADBE Position_1", "posY"],
+    ["ADBE Opacity", "opa"],
+  ];
+
+  var cssText = "";
+
+  var selected = app.project.activeItem.selectedLayers;
+  for (var s = 0; s < selected.length; s++) {
+    var layerName = selected[s].name;
+
+    var baseX = selected[s].effect("baseX")(1);
+    var baseY = selected[s].effect("baseY")(1);
+    var anchor = selected[s].effect("anchor")(1).value;
+
+    var keysGlobal = [],
+      keysLocal = [];
+
+    for (var i = 0; i < props.length; i++) {
+      var prop = selected[s].transform.property(props[i][0]);
+      var keySelection = prop.numKeys;
+
+      if (keySelection > 0) {
+        for (var j = 0; j < keySelection - 1; j++) {
+          var keyOut = prop.keyOutTemporalEase(j + 1);
+          var keyIn = prop.keyInTemporalEase(j + 2);
+
+          var vel1 = [keyOut][0][0].speed;
+          var vel2 = [keyIn][0][0].speed;
+          var a = [keyOut][0][0].influence / 100;
+          var c = 1 - [keyIn][0][0].influence / 100;
+
+          var t1 = prop.keyTime(j + 1);
+          var t2 = prop.keyTime(j + 2);
+
+          var v1Base = prop.keyValue(j + 1);
+          var v2Base = prop.keyValue(j + 2);
+
+          var v1 = getValue(v1Base);
+          var v2 = getValue(v2Base);
+          var dif = (t2 - t1) / (v2 - v1);
+
+          var b = a * vel1 * dif;
+          var d = 1 - (1 - c) * vel2 * dif;
+
+          keysLocal.push([
+            t1,
+            t2,
+            "(" +
+              formatCubic(a) +
+              "," +
+              formatCubic(b) +
+              "," +
+              formatCubic(c) +
+              "," +
+              formatCubic(d) +
+              ")",
+            prop.matchName,
+            v1Base,
+            v2Base,
+          ]);
+        }
+        keysGlobal.push(keysLocal);
+        keysLocal = [];
+      }
+    }
+
+    for (var l = 0; l < keysGlobal.length; l++) {
+      var keys = keysGlobal[l];
+
+      for (var p = 0; p < props.length; p++) {
+        if (props[p][0] === keys[0][3]) {
+          var propName = props[p][1];
+        }
+      }
+      var layerPropName = layerName + "-" + propName;
+      var animName = "anim-" + layerPropName;
+      cssText += "@keyframes " + animName + " {\n   0% {";
+
+      for (var k = 0; k < keys.length; k++) {
+        var pert = Math.round(
+          (100 * keys[k][1]) / (keys[keys.length - 1][1] - keys[0][0])
+        );
+
+        if (keys[k][3] === props[0][0]) {
+          cssText +=
+            "\n      transform: scaleX(" +
+            keys[k][4][0] / 100 +
+            ") scaleY(" +
+            keys[k][4][1] / 100 +
+            ");";
+        }
+        if (keys[k][3] === props[1][0]) {
+          cssText += "\n      transform: rotate(" + keys[k][4] + "deg);";
+        }
+        if (keys[k][3] === props[2][0]) {
+          cssText +=
+            "\n      transform: translateX(" +
+            Math.round(keys[k][4] - baseX.value) +
+            "px);";
+        }
+        if (keys[k][3] === props[3][0]) {
+          cssText +=
+            "\n      transform: translateY(" +
+            Math.round(keys[k][4] - baseY.value) +
+            "px);";
+        }
+        if (keys[k][3] === props[4][0]) {
+          cssText += "\n      opacity: " + Math.round(keys[k][4]) / 100 + ";";
+        }
+
+        cssText +=
+          "\n      animation-timing-function: cubic-bezier" +
+          keys[k][2] +
+          ";\n   }\n   " +
+          pert +
+          "% {";
+
+        if (pert === 100) {
+          if (keys[k][3] === props[0][0]) {
+            cssText +=
+              "\n      transform: scaleX(" +
+              keys[k][5][0] / 100 +
+              ") scaleY(" +
+              keys[k][5][1] / 100 +
+              ");";
+          }
+          if (keys[k][3] === props[1][0]) {
+            cssText += "\n      transform: rotate(" + keys[k][5] + "deg);";
+          }
+          if (keys[k][3] === props[2][0]) {
+            cssText +=
+              "\n      transform: translateX(" +
+              Math.round(keys[k][5] - baseX.value) +
+              "px);";
+          }
+          if (keys[k][3] === props[3][0]) {
+            cssText +=
+              "\n      transform: translateY(" +
+              Math.round(keys[k][5] - baseY.value) +
+              "px);";
+          }
+          if (keys[k][3] === props[4][0]) {
+            cssText += "\n      opacity: " + Math.round(keys[k][5]) / 100 + ";";
+          }
+          cssText += "\n   }";
+        }
+      }
+      cssText +=
+        "\n}\n\n#" +
+        layerPropName +
+        " {\n   animation: " +
+        animName +
+        " 1s infinite;\n}\n\n";
+    }
+
+    cssText +=
+      "." +
+      layerName +
+      " {\n   transform-origin: " +
+      anchor[0] +
+      "px " +
+      anchor[1] +
+      "px;\n}\n\n";
+  }
+
+  cssText = cssText.replace(/NaN/g, "0");
+  return cssText;
+};
+
+function getValue(input) {
+  if (typeof input === "number") {
+    return input;
+  } else if (input instanceof Array && input.length === 2) {
+    var x = input[0];
+    var y = input[1];
+    var r = Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2));
+    return r;
+  } else if (input instanceof Array && input.length === 3) {
+    var x = input[0];
+    var y = input[1];
+    var z = input[2];
+    var r = Math.pow(Math.pow(x, 3) + Math.pow(y, 3) + Math.pow(z, 3), 1 / 3);
+    return r;
+  }
+}
+
+function formatCubic(n: number) {
+  if (n < 0.005 && n > -0.005) n = 0;
+  return n.toFixed(2);
 }
