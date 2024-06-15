@@ -4,27 +4,34 @@ interface ButtonProps {
   label: string;
   disabled?: boolean;
   onClick: React.MouseEventHandler<HTMLButtonElement>;
-  variant?: "primary" | "neutral";
 }
 export const Button: React.FC<ButtonProps> = ({
   onClick,
   label,
   disabled = false,
-  variant = "primary",
 }) => {
-  const [isHover, setIsHover] = useState(false);
+  const [fillColor, setFillColor] = useState<string>("#d30024");
+  const [textColor, setTextColor] = useState<string>("#eee");
 
-  const handleMouseEnter = () => {
-    setIsHover(true);
+  const setStyleIddle = () => {
+    setFillColor("#d30024");
+    setTextColor("#eee");
   };
-  const handleMouseLeave = () => {
-    setIsHover(false);
+
+  const setStyleHover = () => {
+    setFillColor("#fb001f");
+    setTextColor("#121212");
+  };
+
+  const setStyleClick = () => {
+    setFillColor("#ff3939");
+    setTextColor("#121212");
   };
 
   const buttonStyle: React.CSSProperties = {
     border: "none",
-    color: isHover ? "#121212" : "#eee",
-    padding: "8px",
+    color: textColor,
+    padding: "4px 8px",
     textAlign: "center",
     textDecoration: "none",
     outline: "none",
@@ -33,9 +40,10 @@ export const Button: React.FC<ButtonProps> = ({
     borderRadius: "6px",
     fontWeight: 800,
     transition: "all 0.3s ease",
-    backgroundColor: isHover ? "#fb001f" : "#d30024",
+    backgroundColor: fillColor,
     cursor: disabled ? "not-allowed" : "pointer",
     opacity: disabled ? 0.5 : 1,
+    userSelect: "none",
   };
 
   return (
@@ -43,8 +51,10 @@ export const Button: React.FC<ButtonProps> = ({
       onClick={onClick}
       disabled={disabled}
       style={buttonStyle}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
+      onMouseEnter={setStyleHover}
+      onMouseLeave={setStyleIddle}
+      onMouseDown={setStyleClick}
+      onMouseUp={setStyleHover}
     >
       {label}
     </button>
