@@ -1,5 +1,32 @@
 import { getActiveComp } from "./aeft-utils";
 
+export const openWeb = (site: string) => {
+  if (
+    app.preferences.getPrefAsLong(
+      "Main Pref Section",
+      "Pref_SCRIPTING_FILE_NETWORK_SECURITY"
+    ) != 1
+  ) {
+    alert(
+      'Please tick the "Allow Scripts to Write Files and Access Network" checkbox if Preferences > General'
+    );
+    app.executeCommand(2359);
+  }
+
+  var os = system.osName;
+  if (!os.length) {
+    os = $.os;
+  }
+  var appOs = os.indexOf("Win") != -1 ? "Win" : "Mac";
+
+  var url = site;
+  if (appOs == "Win") {
+    system.callSystem("explorer " + url);
+  } else {
+    system.callSystem("open " + url);
+  }
+};
+
 export const goKeyflames = () => {
   return extractPaths() + `<style>${scanTransformToCSS()}\n</style>`;
 };
