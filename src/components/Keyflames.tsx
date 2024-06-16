@@ -66,6 +66,18 @@ const Keyflames = () => {
           onMouseLeave={() => setIsHoveringSvg(false)}
         >
           <Box
+            sx={{
+              m: 1,
+              position: "absolute",
+              top: "0%",
+              left: "0%",
+              transition: "all 120ms ease",
+              opacity: isHoveringSvg ? 1 : 0,
+            }}
+          >
+            {isPlayingSvg ? <Pause /> : <Play />}
+          </Box>
+          <Box
             onClick={handlePlayPause}
             sx={{
               cursor: "pointer",
@@ -73,20 +85,6 @@ const Keyflames = () => {
             }}
             dangerouslySetInnerHTML={{ __html: svg }}
           />
-          <Box
-            onClick={handlePlayPause}
-            sx={{
-              m: 1,
-              position: "absolute",
-              top: "0%",
-              left: "0%",
-              cursor: "pointer",
-              transition: "all 120ms ease",
-              opacity: isHoveringSvg ? 1 : 0,
-            }}
-          >
-            {isPlayingSvg ? <Pause /> : <Play />}
-          </Box>
         </Box>
       )}
     </Container>
