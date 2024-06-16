@@ -27,8 +27,12 @@ const Keyflames = () => {
   };
 
   return (
-    <Container disableGutters sx={{ p: 1 }}>
-      <Stack direction="row" spacing={1}>
+    <Container disableGutters sx={{ px: 1 }}>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={1}
+        justifyContent="center"
+      >
         <Button
           size="sm"
           onClick={handleMotionToSVG}
@@ -53,9 +57,10 @@ const Keyflames = () => {
           sx={{
             position: "relative",
             mt: 1,
-            border: "1px solid #cccccc00",
+            border: "0px solid #cccccc00",
             transition: "all 120ms ease",
-            ":hover": { border: "1px solid #ccc" },
+            borderRadius: 10,
+            ":hover": { bgcolor: "#181818" },
           }}
           onMouseEnter={() => setIsHoveringSvg(true)}
           onMouseLeave={() => setIsHoveringSvg(false)}

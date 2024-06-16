@@ -5,6 +5,15 @@ import { CssBaseline, CssVarsProvider } from "@mui/joy";
 import { extendTheme } from "@mui/joy";
 
 const theme = extendTheme({
+  breakpoints: {
+    values: {
+      xs: 0,
+      sm: 200,
+      md: 800,
+      lg: 1200,
+      xl: 1536,
+    },
+  },
   colorSchemes: {
     dark: {
       palette: {
@@ -19,6 +28,18 @@ const theme = extendTheme({
           700: "#840001",
           800: "#480001",
           900: "#260001",
+        },
+        neutral: {
+          50: "#fcfcfc",
+          100: "#f4f4f4",
+          200: "#e5e5e5",
+          300: "#d7d7d7",
+          400: "#a6a6a6",
+          500: "#6b6b6b",
+          600: "#5e5e5e",
+          700: "#383838",
+          800: "#191919",
+          900: "#0c0c0c",
         },
         background: {
           body: "#232323",
