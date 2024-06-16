@@ -250,9 +250,9 @@ export const scanTransformToCSS = () => {
   for (var s = 0; s < selected.length; s++) {
     var layerName = selected[s].name;
 
-    var baseX = selected[s].effect("baseX")(1);
-    var baseY = selected[s].effect("baseY")(1);
-    var anchor = selected[s].effect("anchor")(1).value;
+    const ancX = selected[s].transform.anchorPoint.value[0];
+    const ancY = selected[s].transform.anchorPoint.value[1];
+    const anchorToComp = selected[s].sourcePointToComp([ancX, ancY]);
 
     var keysGlobal = [],
       keysLocal = [];
@@ -337,13 +337,13 @@ export const scanTransformToCSS = () => {
         if (keys[k][3] === props[2][0]) {
           cssText +=
             "\n      transform: translateX(" +
-            Math.round(keys[k][4] - baseX.value) +
+            Math.round(keys[k][4] - anchorToComp[0]) +
             "px);";
         }
         if (keys[k][3] === props[3][0]) {
           cssText +=
             "\n      transform: translateY(" +
-            Math.round(keys[k][4] - baseY.value) +
+            Math.round(keys[k][4] - anchorToComp[1]) +
             "px);";
         }
         if (keys[k][3] === props[4][0]) {
@@ -372,13 +372,13 @@ export const scanTransformToCSS = () => {
           if (keys[k][3] === props[2][0]) {
             cssText +=
               "\n      transform: translateX(" +
-              Math.round(keys[k][5] - baseX.value) +
+              Math.round(keys[k][5] - anchorToComp[0]) +
               "px);";
           }
           if (keys[k][3] === props[3][0]) {
             cssText +=
               "\n      transform: translateY(" +
-              Math.round(keys[k][5] - baseY.value) +
+              Math.round(keys[k][5] - anchorToComp[1]) +
               "px);";
           }
           if (keys[k][3] === props[4][0]) {
@@ -399,9 +399,9 @@ export const scanTransformToCSS = () => {
       "." +
       layerName +
       " {\n   transform-origin: " +
-      anchor[0] +
+      anchorToComp[0] +
       "px " +
-      anchor[1] +
+      anchorToComp[1] +
       "px;\n}\n\n";
   }
 
