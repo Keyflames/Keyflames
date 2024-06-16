@@ -11,11 +11,10 @@ export const Button: React.FC<ButtonProps> = ({
   disabled = false,
 }) => {
   const [fillColor, setFillColor] = useState<string>("#d30024");
-  const [textColor, setTextColor] = useState<string>("#eee");
+  const [textColor, setTextColor] = useState<string>("#121212");
 
   const setStyleIddle = () => {
     setFillColor("#d30024");
-    setTextColor("#eee");
   };
 
   const setStyleHover = () => {
@@ -39,7 +38,6 @@ export const Button: React.FC<ButtonProps> = ({
     fontSize: "12px",
     borderRadius: "6px",
     fontWeight: 800,
-    transition: "all 0.3s ease",
     backgroundColor: fillColor,
     cursor: disabled ? "not-allowed" : "pointer",
     opacity: disabled ? 0.5 : 1,
