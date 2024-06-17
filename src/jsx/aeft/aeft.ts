@@ -28,7 +28,7 @@ export const openWeb = (site: string) => {
 };
 
 export const goKeyflames = () => {
-  return extractPaths() + `<style>${scanTransformToCSS()}\n</style>`;
+  return extractPaths() + `<style>\n${scanTransformToCSS()}</style></svg>`;
 };
 
 export const extractPaths = () => {
@@ -123,7 +123,7 @@ export const extractPaths = () => {
     }
     svgCode += "</g></g></g></g></g>";
   }
-  svgCode += "</svg>";
+  // svgCode += "</svg>";
   return svgCode;
 };
 
