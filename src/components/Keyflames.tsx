@@ -2,7 +2,7 @@ import { useState } from "react";
 import { evalTS } from "../js/lib/utils/bolt";
 import { copySVGToClipboard } from "../utils/copySVGToClipboard";
 import { previewPlayAndPause } from "../utils/previewPlayAndPause";
-import { Button, Stack, Box, IconButton, Container } from "@mui/joy";
+import { Button, Stack, Box, Container } from "@mui/joy";
 import { Play, Pause, Flame, Copy } from "lucide-react";
 
 const Keyflames = () => {
