@@ -57,6 +57,8 @@ export const extractPaths = () => {
     if (layerPosX.numKeys > 0) layerPosValX = layerPosX.keyValue(1);
     if (layerPosY.numKeys > 0) layerPosValY = layerPosY.keyValue(1);
 
+    comp.time = 0;
+
     var layerAnchor: number[] = selected[s].transform.anchorPoint.value;
     var layerPosVal: number[] = [layerPosValX, layerPosValY];
     var layerPos: number[] = [];
@@ -88,12 +90,17 @@ export const extractPaths = () => {
       layerName +
       '="base">';
 
+    //@ts-ignore
     for (var i = selectedGroups.numProperties; i >= 1; i--) {
+      //@ts-ignore
       var localPos = selectedGroups(i)("ADBE Vector Transform Group")(
         "ADBE Vector Position"
       ).value;
+      //@ts-ignore
       var localProp = selectedGroups(i)("ADBE Vectors Group");
       var groupFill = "black";
+      var groupStrokeColor = "black";
+      var groupStrokeWidth = 0;
       var groupPath = "";
       for (var j = 1; j <= localProp.numProperties; j++) {
         var propName = localProp(j).matchName;
@@ -118,8 +125,17 @@ export const extractPaths = () => {
             localFill[2] * 255
           );
         }
+        if (propName === "ADBE Vector Graphic - Stroke") {
+          var localStrokeColor = localProp(j)(3).value;
+          groupStrokeColor = rgbToHex(
+            localStrokeColor[0] * 255,
+            localStrokeColor[1] * 255,
+            localStrokeColor[2] * 255
+          );
+          groupStrokeWidth = localProp(j)(5).value;
+        }
       }
-      svgCode += '<path fill="' + groupFill + '" d="' + groupPath + '"/>';
+      svgCode += `<path fill="${groupFill}" stroke="${groupStrokeColor}" stroke-width="${groupStrokeWidth}px" d="${groupPath}"/>`;
     }
     svgCode += "</g></g></g></g></g>";
   }
@@ -171,7 +187,11 @@ function rgbToHex(red: any, green: any, blue: any) {
   return hex;
 }
 
-function convertPointsToSVGPath(points, inTangents, outTangents) {
+function convertPointsToSVGPath(
+  points: number[],
+  inTangents: number[][],
+  outTangents: number[][]
+) {
   var path = "M";
 
   for (var i = 0; i < points.length; i += 2) {
@@ -246,12 +266,14 @@ export const scanTransformToCSS = () => {
 
   var cssText = "";
 
-  var selected = app.project.activeItem.selectedLayers;
+  var comp = getActiveComp();
+  var selected = comp.selectedLayers;
   for (var s = 0; s < selected.length; s++) {
     var layerName = selected[s].name;
 
     const ancX = selected[s].transform.anchorPoint.value[0];
     const ancY = selected[s].transform.anchorPoint.value[1];
+    //@ts-ignore
     const anchorToComp = selected[s].sourcePointToComp([ancX, ancY]);
 
     var keysGlobal = [],
@@ -259,11 +281,14 @@ export const scanTransformToCSS = () => {
 
     for (var i = 0; i < props.length; i++) {
       var prop = selected[s].transform.property(props[i][0]);
+      //@ts-ignore
       var keySelection = prop.numKeys;
 
       if (keySelection > 0) {
         for (var j = 0; j < keySelection - 1; j++) {
+          //@ts-ignore
           var keyOut = prop.keyOutTemporalEase(j + 1);
+          //@ts-ignore
           var keyIn = prop.keyInTemporalEase(j + 2);
 
           var vel1 = [keyOut][0][0].speed;
@@ -271,14 +296,21 @@ export const scanTransformToCSS = () => {
           var a = [keyOut][0][0].influence / 100;
           var c = 1 - [keyIn][0][0].influence / 100;
 
+          //@ts-ignore
           var t1 = prop.keyTime(j + 1);
+          //@ts-ignore
           var t2 = prop.keyTime(j + 2);
 
+          //@ts-ignore
           var v1Base = prop.keyValue(j + 1);
+          //@ts-ignore
           var v2Base = prop.keyValue(j + 2);
 
           var v1 = getValue(v1Base);
           var v2 = getValue(v2Base);
+
+          if (v1 === undefined || v2 === undefined)
+            throw new Error("something happened");
           var dif = (t2 - t1) / (v2 - v1);
 
           var b = a * vel1 * dif;
@@ -308,10 +340,10 @@ export const scanTransformToCSS = () => {
 
     for (var l = 0; l < keysGlobal.length; l++) {
       var keys = keysGlobal[l];
-
+      var propName = "";
       for (var p = 0; p < props.length; p++) {
         if (props[p][0] === keys[0][3]) {
-          var propName = props[p][1];
+          propName = props[p][1];
         }
       }
       var layerPropName = layerName + "-" + propName;
@@ -409,7 +441,7 @@ export const scanTransformToCSS = () => {
   return cssText;
 };
 
-function getValue(input) {
+function getValue(input: any) {
   if (typeof input === "number") {
     return input;
   } else if (input instanceof Array && input.length === 2) {
