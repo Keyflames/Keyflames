@@ -8,7 +8,7 @@ Learn how to use it on this 2min [Youtube Tutorial](https://youtu.be/VHF-YszJEpA
 
 ## Roadmap
 Follow the public updates [here](https://github.com/orgs/Keyflames/projects/1)
-- [x] Convert paths into SVG (only fill)
+- [x] Convert paths into SVG (fill and stroke)
 - [x] Convert basic keyframes transformations into CSS
 - [ ] Support Masks
 - [ ] Support Parent
