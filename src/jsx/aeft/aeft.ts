@@ -28,13 +28,124 @@ export const openWeb = (site: string) => {
 };
 
 export const goKeyflames = () => {
+  getAnimatedPaths();
   return extractPaths() + `<style>\n${scanTransformToCSS()}</style></svg>`;
+};
+
+export const getAnimatedPaths = () => {
+  var comp = getActiveComp();
+
+  var selected = comp.selectedLayers;
+
+  for (var s = selected.length - 1; s > -1; s--) {
+    var selectedGroups = selected[s].property("ADBE Root Vectors Group");
+    var layerName = selected[s].name;
+
+    var layerPosX = selected[s].transform.xPosition;
+    var layerPosY = selected[s].transform.yPosition;
+    var layerPosValX = layerPosX.value;
+    var layerPosValY = layerPosY.value;
+    if (layerPosX.numKeys > 0) layerPosValX = layerPosX.keyValue(1);
+    if (layerPosY.numKeys > 0) layerPosValY = layerPosY.keyValue(1);
+
+    var layerAnchor: number[] = selected[s].transform.anchorPoint.value;
+    var layerPosVal: number[] = [layerPosValX, layerPosValY];
+    var layerPos: number[] = [];
+
+    for (let i = 0; i < layerPosVal.length; i++) {
+      layerPos[i] = layerPosVal[i] - layerAnchor[i];
+    }
+
+    //@ts-ignore
+    for (var i = selectedGroups.numProperties; i >= 1; i--) {
+      //@ts-ignore
+      var localPos = selectedGroups(i)("ADBE Vector Transform Group")(
+        "ADBE Vector Position"
+      ).value;
+      //@ts-ignore
+      var localProp = selectedGroups(i)("ADBE Vectors Group");
+      var groupPath = "";
+
+      var keysGlobal: any = [];
+      var keysLocal: any = [];
+
+      for (var j = 1; j <= localProp.numProperties; j++) {
+        var propName = localProp(j).matchName;
+        if (propName === "ADBE Vector Shape - Group") {
+          var localPathKeys = localProp(j).path.numKeys;
+          if (localPathKeys === 0) return;
+          var prop = localProp(j).path;
+
+          for (var k = 0; k < localPathKeys - 1; k++) {
+            //@ts-ignore
+            var keyOut = prop.keyOutTemporalEase(k + 1);
+            //@ts-ignore
+            var keyIn = prop.keyInTemporalEase(k + 2);
+
+            var vel1 = [keyOut][0][0].speed;
+            var vel2 = [keyIn][0][0].speed;
+            var a = [keyOut][0][0].influence / 100;
+            var c = 1 - [keyIn][0][0].influence / 100;
+
+            //@ts-ignore
+            var t1 = prop.keyTime(k + 1);
+            //@ts-ignore
+            var t2 = prop.keyTime(k + 2);
+
+            //@ts-ignore
+            var v1Base = prop.keyValue(k + 1);
+            //@ts-ignore
+            var v2Base = prop.keyValue(k + 2);
+
+            var vert1 = roundAndSumRow(
+              v1Base.vertices,
+              layerPos[0] + localPos[0],
+              layerPos[1] + localPos[1]
+            );
+            var ins1 = roundAndSumPair(v2Base.inTangents, 0, 0);
+            var outs1 = roundAndSumPair(v2Base.outTangents, 0, 0);
+
+            var vert2 = roundAndSumRow(
+              v2Base.vertices,
+              layerPos[0] + localPos[0],
+              layerPos[1] + localPos[1]
+            );
+            var ins2 = roundAndSumPair(v2Base.inTangents, 0, 0);
+            var outs2 = roundAndSumPair(v2Base.outTangents, 0, 0);
+
+            var b = a * vel1; // * dif;
+            var d = 1 - (1 - c) * vel2; // * dif;
+
+            keysLocal.push([
+              t1,
+              t2,
+              "(" +
+                formatCubic(a) +
+                "," +
+                formatCubic(b) +
+                "," +
+                formatCubic(c) +
+                "," +
+                formatCubic(d) +
+                ")",
+              `${layerName}-path-${i + 1}`,
+              convertPointsToSVGPath(vert1, ins1, outs1),
+              convertPointsToSVGPath(vert2, ins2, outs2),
+            ]);
+          }
+          keysGlobal.push(keysLocal);
+          keysLocal = [];
+        }
+      }
+      alert(JSON.stringify(keysGlobal));
+    }
+  }
 };
 
 export const extractPaths = () => {
   var comp = getActiveComp();
   var svgCode =
-    '<svg id="keyflames" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" x="0px" y="0px" viewBox="0 0 ' +
+    '<svg id="keyflames" viewBox="0 0 ' +
     comp.width +
     " " +
     comp.height +
@@ -135,7 +246,9 @@ export const extractPaths = () => {
           groupStrokeWidth = localProp(j)(5).value;
         }
       }
-      svgCode += `<path fill="${groupFill}" stroke="${groupStrokeColor}" stroke-width="${groupStrokeWidth}px" d="${groupPath}"/>`;
+      svgCode += `<path id="${layerName}-path-${
+        i + 1
+      }" fill="${groupFill}" stroke="${groupStrokeColor}" stroke-width="${groupStrokeWidth}px" d="${groupPath}"/>`;
     }
     svgCode += "</g></g></g></g></g>";
   }
