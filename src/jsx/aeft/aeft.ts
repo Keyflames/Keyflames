@@ -28,13 +28,153 @@ export const openWeb = (site: string) => {
 };
 
 export const goKeyflames = () => {
-  return extractPaths() + `<style>\n${scanTransformToCSS()}</style></svg>`;
+  return (
+    extractPaths() +
+    `<style>\n${scanTransformToCSS()}\n${scanPathsToCSS()}</style></svg>`
+  );
+};
+
+export const scanPathsToCSS = () => {
+  var comp = getActiveComp();
+
+  var selected = comp.selectedLayers;
+  var cssText = "";
+
+  for (var s = selected.length - 1; s > -1; s--) {
+    var selectedGroups = selected[s].property("ADBE Root Vectors Group");
+    var layerName = selected[s].name;
+
+    var layerPosX = selected[s].transform.xPosition;
+    var layerPosY = selected[s].transform.yPosition;
+    var layerPosValX = layerPosX.value;
+    var layerPosValY = layerPosY.value;
+    if (layerPosX.numKeys > 0) layerPosValX = layerPosX.keyValue(1);
+    if (layerPosY.numKeys > 0) layerPosValY = layerPosY.keyValue(1);
+
+    var layerAnchor: number[] = selected[s].transform.anchorPoint.value;
+    var layerPosVal: number[] = [layerPosValX, layerPosValY];
+    var layerPos: number[] = [];
+
+    for (let i = 0; i < layerPosVal.length; i++) {
+      layerPos[i] = layerPosVal[i] - layerAnchor[i];
+    }
+
+    //@ts-ignore
+    for (var i = selectedGroups.numProperties; i >= 1; i--) {
+      //@ts-ignore
+      var localPos = selectedGroups(i)("ADBE Vector Transform Group")(
+        "ADBE Vector Position"
+      ).value;
+      //@ts-ignore
+      var localProp = selectedGroups(i)("ADBE Vectors Group");
+      var groupPath = "";
+
+      var keysGlobal: any = [];
+      var keysLocal: any = [];
+
+      for (var j = 1; j <= localProp.numProperties; j++) {
+        var propName = localProp(j).matchName;
+        if (propName === "ADBE Vector Shape - Group") {
+          var localPathKeys = localProp(j).path.numKeys;
+          if (localPathKeys > 0) {
+            var prop = localProp(j).path;
+
+            for (var k = 0; k < localPathKeys - 1; k++) {
+              //@ts-ignore
+              var keyOut = prop.keyOutTemporalEase(k + 1);
+              //@ts-ignore
+              var keyIn = prop.keyInTemporalEase(k + 2);
+
+              var vel1 = [keyOut][0][0].speed;
+              var vel2 = [keyIn][0][0].speed;
+              var a = [keyOut][0][0].influence / 100;
+              var c = 1 - [keyIn][0][0].influence / 100;
+
+              //@ts-ignore
+              var t1 = prop.keyTime(k + 1);
+              //@ts-ignore
+              var t2 = prop.keyTime(k + 2);
+
+              //@ts-ignore
+              var v1Base = prop.keyValue(k + 1);
+              //@ts-ignore
+              var v2Base = prop.keyValue(k + 2);
+
+              var vert1 = roundAndSumRow(
+                v1Base.vertices,
+                layerPos[0] + localPos[0],
+                layerPos[1] + localPos[1]
+              );
+
+              var ins1 = roundAndSumPair(v1Base.inTangents, 0, 0);
+              var outs1 = roundAndSumPair(v1Base.outTangents, 0, 0);
+
+              var vert2 = roundAndSumRow(
+                v2Base.vertices,
+                layerPos[0] + localPos[0],
+                layerPos[1] + localPos[1]
+              );
+              var ins2 = roundAndSumPair(v2Base.inTangents, 0, 0);
+              var outs2 = roundAndSumPair(v2Base.outTangents, 0, 0);
+
+              var b = a * vel1; // * dif;
+              var d = 1 - (1 - c) * vel2; // * dif;
+
+              keysLocal.push([
+                t1,
+                t2,
+                "(" +
+                  formatCubic(a) +
+                  "," +
+                  formatCubic(b) +
+                  "," +
+                  formatCubic(c) +
+                  "," +
+                  formatCubic(d) +
+                  ")",
+                `${layerName}-path-${i + 1}`,
+                convertPointsToSVGPath(vert1, ins1, outs1, v1Base.closed),
+                convertPointsToSVGPath(vert2, ins2, outs2, v2Base.closed),
+              ]);
+            }
+            keysGlobal.push(keysLocal);
+            keysLocal = [];
+          }
+        }
+      }
+
+      // Generate CSS from keysGlobal
+      for (var l = 0; l < keysGlobal.length; l++) {
+        var keys = keysGlobal[l];
+        var animName = `anim-${layerName}-path-${i}`;
+        cssText += `@keyframes ${animName} {\n 0% {`;
+
+        for (var k = 0; k < keys.length; k++) {
+          var pert = Math.round(
+            (100 * keys[k][1]) / (keys[keys.length - 1][1] - keys[0][0])
+          );
+
+          cssText += `  \n    d: path("${keys[k][4]}");\n`;
+          cssText += `    animation-timing-function: cubic-bezier${keys[k][2]};\n  }\n ${pert}% {`;
+
+          if (pert === 100) {
+            cssText += `  \n    d: path("${keys[k][5]}");\n  }\n`;
+          }
+        }
+
+        cssText += `}\n\n#${layerName}-path-${i} {\n  animation: ${animName} 1s infinite;\n}\n\n`;
+      }
+    }
+  }
+
+  cssText = cssText.replace(/NaN/g, "0");
+  return cssText;
 };
 
 export const extractPaths = () => {
   var comp = getActiveComp();
   var svgCode =
-    '<svg id="keyflames" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" x="0px" y="0px" viewBox="0 0 ' +
+    '<svg id="keyflames" viewBox="0 0 ' +
     comp.width +
     " " +
     comp.height +
@@ -42,7 +182,7 @@ export const extractPaths = () => {
     comp.width +
     " " +
     comp.height +
-    '" xml:space="preserve">';
+    '">';
 
   var selected = comp.selectedLayers;
 
@@ -98,8 +238,8 @@ export const extractPaths = () => {
       ).value;
       //@ts-ignore
       var localProp = selectedGroups(i)("ADBE Vectors Group");
-      var groupFill = "black";
-      var groupStrokeColor = "black";
+      var groupFill = "none";
+      var groupStrokeColor = "none";
       var groupStrokeWidth = 0;
       var groupPath = "";
       for (var j = 1; j <= localProp.numProperties; j++) {
@@ -115,7 +255,8 @@ export const extractPaths = () => {
           var ins = roundAndSumPair(localPath.inTangents, 0, 0);
           var outs = roundAndSumPair(localPath.outTangents, 0, 0);
 
-          groupPath += convertPointsToSVGPath(vert, ins, outs) + " ";
+          groupPath +=
+            convertPointsToSVGPath(vert, ins, outs, localPath.closed) + " ";
         }
         if (propName === "ADBE Vector Graphic - Fill") {
           var localFill = localProp(j)(4).value;
@@ -135,7 +276,7 @@ export const extractPaths = () => {
           groupStrokeWidth = localProp(j)(5).value;
         }
       }
-      svgCode += `<path fill="${groupFill}" stroke="${groupStrokeColor}" stroke-width="${groupStrokeWidth}px" d="${groupPath}"/>`;
+      svgCode += `<path id="${layerName}-path-${i}" fill="${groupFill}" stroke="${groupStrokeColor}" stroke-width="${groupStrokeWidth}px" d="${groupPath}"/>`;
     }
     svgCode += "</g></g></g></g></g>";
   }
@@ -190,65 +331,41 @@ function rgbToHex(red: any, green: any, blue: any) {
 function convertPointsToSVGPath(
   points: number[],
   inTangents: number[][],
-  outTangents: number[][]
+  outTangents: number[][],
+  closed: boolean = true
 ) {
-  var path = "M";
+  let path = "M";
 
-  for (var i = 0; i < points.length; i += 2) {
-    var x = points[i];
-    var y = points[i + 1];
+  for (let i = 0; i < points.length; i += 2) {
+    const x = points[i];
+    const y = points[i + 1];
 
     if (i !== 0) {
-      var prevX = points[i - 2];
-      var prevY = points[i - 1];
-      var inTangentX = prevX + outTangents[i / 2 - 1][0];
-      var inTangentY = prevY + outTangents[i / 2 - 1][1];
-      var outTangentX = x + inTangents[i / 2][0];
-      var outTangentY = y + inTangents[i / 2][1];
+      const prevX = points[i - 2];
+      const prevY = points[i - 1];
+      const inTangentX = prevX + outTangents[Math.floor(i / 2) - 1][0];
+      const inTangentY = prevY + outTangents[Math.floor(i / 2) - 1][1];
+      const outTangentX = x + inTangents[Math.floor(i / 2)][0];
+      const outTangentY = y + inTangents[Math.floor(i / 2)][1];
 
-      path +=
-        " C" +
-        inTangentX +
-        "," +
-        inTangentY +
-        " " +
-        outTangentX +
-        "," +
-        outTangentY +
-        " " +
-        x +
-        "," +
-        y;
+      path += ` C${inTangentX},${inTangentY} ${outTangentX},${outTangentY} ${x},${y}`;
     } else {
-      path += x + "," + y;
+      path += `${x},${y}`;
     }
   }
 
-  if (points.length > 2) {
-    var firstX = points[0];
-    var firstY = points[1];
-    var lastX = points[points.length - 2];
-    var lastY = points[points.length - 1];
-    var lastInTangentX = lastX + outTangents[outTangents.length - 1][0];
-    var lastInTangentY = lastY + outTangents[outTangents.length - 1][1];
-    var firstOutTangentX = firstX + inTangents[0][0];
-    var firstOutTangentY = firstY + inTangents[0][1];
+  if (closed && points.length > 2) {
+    const firstX = points[0];
+    const firstY = points[1];
+    const lastX = points[points.length - 2];
+    const lastY = points[points.length - 1];
+    const lastInTangentX = lastX + outTangents[outTangents.length - 1][0];
+    const lastInTangentY = lastY + outTangents[outTangents.length - 1][1];
+    const firstOutTangentX = firstX + inTangents[0][0];
+    const firstOutTangentY = firstY + inTangents[0][1];
 
-    path +=
-      " C" +
-      lastInTangentX +
-      "," +
-      lastInTangentY +
-      " " +
-      firstOutTangentX +
-      "," +
-      firstOutTangentY +
-      " " +
-      firstX +
-      "," +
-      firstY +
-      " Z";
-  } else {
+    path += ` C${lastInTangentX},${lastInTangentY} ${firstOutTangentX},${firstOutTangentY} ${firstX},${firstY} Z`;
+  } else if (closed) {
     path += " Z";
   }
 

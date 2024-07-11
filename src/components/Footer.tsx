@@ -29,9 +29,9 @@ export const Footer = () => {
           textAlign="center"
           sx={{ userSelect: "none" }}
         >
-          Beta 0.1.0
+          Beta 0.1.2
         </Typography>
-        <Tooltip title='give us a star :)' placement="top" size="md">
+        <Tooltip title="give us a star :)" placement="top" size="md">
           <IconButton onClick={handleOpenRepo} sx={{ outline: "none" }}>
             <Github size={20} absoluteStrokeWidth={true} />
           </IconButton>
